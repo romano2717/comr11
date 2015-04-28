@@ -596,75 +596,76 @@
                     }
                 } completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, BOOL finished, NSURL *imageURL) {
                     
-                    if(image == nil)
-                        return;
-                    
-                    //create the image here
-                    NSData *jpegImageData = UIImageJPEGRepresentation(image, 1);
-                    
-                    //save the image to app documents dir
-                    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-                    NSString *documentsPath = [paths objectAtIndex:0];
-                    
-                    NSString *filePath = [documentsPath stringByAppendingPathComponent:imageFilename]; //Add the file name
-                    [jpegImageData writeToFile:filePath atomically:YES];
-                    
-                    NSFileManager *fManager = [[NSFileManager alloc] init];
-                    if([fManager fileExistsAtPath:filePath] == NO)
-                        return;
-                    
-                    //resize the saved image
-                    [imgOpts resizeImageAtPath:filePath];
-                    
-                    [myDatabase.databaseQ inTransaction:^(FMDatabase *db, BOOL *rollback) {
-
-                        FMResultSet *rsPostImage = [db executeQuery:@"select post_image_id from post_image where post_image_id = ? and (post_image_id is not null or post_image_id > ?)",PostImageId,[NSNumber numberWithInt:0]];
-
-                        if([rsPostImage next] == NO) //does not exist, insert
-                        {
-                            BOOL qIns = [db executeUpdate:@"insert into post_image(comment_id, image_type, post_id, post_image_id, image_path) values(?,?,?,?,?)",CommentId,ImageType,PostId,PostImageId,imageFilename];
-                            
-                            if(!qIns)
-                            {
-                                *rollback = YES;
-                                return;
-                            }
-                        }
+                    if(image != nil)
+                    {
+                        //create the image here
+                        NSData *jpegImageData = UIImageJPEGRepresentation(image, 1);
                         
-                        if(imagesArr.count-1 == xx) //last image
-                        {
-                            FMResultSet *rs = [db executeQuery:@"select * from post_image_last_request_date"];
-    
-                            if(![rs next])
+                        //save the image to app documents dir
+                        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                        NSString *documentsPath = [paths objectAtIndex:0];
+                        
+                        NSString *filePath = [documentsPath stringByAppendingPathComponent:imageFilename]; //Add the file name
+                        [jpegImageData writeToFile:filePath atomically:YES];
+                        
+                        NSFileManager *fManager = [[NSFileManager alloc] init];
+                        if([fManager fileExistsAtPath:filePath] == NO)
+                            return;
+                        
+                        //resize the saved image
+                        [imgOpts resizeImageAtPath:filePath];
+                        
+                        [myDatabase.databaseQ inTransaction:^(FMDatabase *db, BOOL *rollback) {
+                            
+                            FMResultSet *rsPostImage = [db executeQuery:@"select post_image_id from post_image where post_image_id = ? and (post_image_id is not null or post_image_id > ?)",PostImageId,[NSNumber numberWithInt:0]];
+                            
+                            if([rsPostImage next] == NO) //does not exist, insert
                             {
-                                BOOL qIns = [db executeUpdate:@"insert into post_image_last_request_date(date) values(?)",lastRequestDate];
-    
+                                BOOL qIns = [db executeUpdate:@"insert into post_image(comment_id, image_type, post_id, post_image_id, image_path) values(?,?,?,?,?)",CommentId,ImageType,PostId,PostImageId,imageFilename];
+                                
                                 if(!qIns)
                                 {
                                     *rollback = YES;
                                     return;
                                 }
                             }
-                            else
-                            {
-                                BOOL qUp = [db executeUpdate:@"update post_image_last_request_date set date = ? ",lastRequestDate];
-                                
-                                if(!qUp)
-                                {
-                                    *rollback = YES;
-                                    return;
-                                }
-                            }
                             
-                            imageDownloadComplete = YES;
-    
-                            self.processLabel.text = @"Download complete";
-                        }
-                    }];
-                    
-                    if(imageDownloadComplete == YES)
+                            if(imagesArr.count-1 == xx) //last image
+                            {
+                                FMResultSet *rs = [db executeQuery:@"select * from post_image_last_request_date"];
+                                
+                                if(![rs next])
+                                {
+                                    BOOL qIns = [db executeUpdate:@"insert into post_image_last_request_date(date) values(?)",lastRequestDate];
+                                    
+                                    if(!qIns)
+                                    {
+                                        *rollback = YES;
+                                        return;
+                                    }
+                                }
+                                else
+                                {
+                                    BOOL qUp = [db executeUpdate:@"update post_image_last_request_date set date = ? ",lastRequestDate];
+                                    
+                                    if(!qUp)
+                                    {
+                                        *rollback = YES;
+                                        return;
+                                    }
+                                }
+                                
+                                imageDownloadComplete = YES;
+                                
+                                self.processLabel.text = @"Download complete";
+                            }
+                        }];
+                        
+                        if(imageDownloadComplete == YES)
+                            [self checkCommentNotiCount];
+                    }
+                    else
                         [self checkCommentNotiCount];
-                    
                 }];
             }
         }
