@@ -18,7 +18,7 @@
 
 @implementation ResidentPopInfoViewController
 
-@synthesize surveyId,blockId,clientSurveyId,okToSubmitForm,formErrorMsg,residentBlockId;
+@synthesize surveyId,blockId,clientSurveyId,okToSubmitForm,formErrorMsg,residentBlockId,residentAddressIsNew;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -42,6 +42,8 @@
     self.client_resident_address_id = [[surveyDict valueForKey:@"client_resident_address_id"] longLongValue];
     self.client_survey_address_id = [[surveyDict valueForKey:@"client_survey_address_id"] longLongValue];
     self.surveyAddressPostalCode = [surveyAddressDict valueForKey:@"postal_code"];
+    residentBlockId = [NSNumber numberWithInt:[[residentAddressDict valueForKey:@"block_id"] intValue]];
+    self.residentAddressPostalCode = [residentAddressDict valueForKey:@"postal_code"];
 
     NSString *surveyAddress;
     NSString *area;
@@ -232,6 +234,63 @@
     return YES;
 }
 
+- (IBAction)selectAge:(id)sender
+{
+    [self.view endEditing:YES];
+    
+    [ActionSheetStringPicker showPickerWithTitle:@"Contract type" rows:self.ageRangeArray initialSelection:0 doneBlock:^(ActionSheetStringPicker *picker, NSInteger selectedIndex, id selectedValue) {
+        
+        [self.ageBtn setTitle:[NSString stringWithFormat:@" %@",[self.ageRangeArray objectAtIndex:selectedIndex]] forState:UIControlStateNormal];
+        
+    } cancelBlock:^(ActionSheetStringPicker *picker) {
+        
+    } origin:sender];
+}
+
+- (IBAction)selectRace:(id)sender
+{
+    [self.view endEditing:YES];
+    
+    [ActionSheetStringPicker showPickerWithTitle:@"Contract type" rows:self.raceArray initialSelection:0 doneBlock:^(ActionSheetStringPicker *picker, NSInteger selectedIndex, id selectedValue) {
+        
+        [self.raceBtn setTitle:[NSString stringWithFormat:@" %@",[self.raceArray objectAtIndex:selectedIndex]] forState:UIControlStateNormal];
+        
+    } cancelBlock:^(ActionSheetStringPicker *picker) {
+        
+    } origin:sender];
+}
+
+-(IBAction)toggelGender:(id)sender
+{
+    UIButton *btn = (UIButton *)sender;
+    
+    UIButton *femBtn = (UIButton *)[self.view viewWithTag:2];
+    UIButton *maleBtn = (UIButton *)[self.view viewWithTag:1];
+    
+    int tag = (int)btn.tag;
+    
+    
+    [btn setSelected:!btn.selected];
+    
+    if(tag == 1) //male
+    {
+        
+        self.gender = @"M";
+        self.selectedGender = @"M";
+        
+        [maleBtn setSelected:YES];
+        [femBtn setSelected:NO];
+    }
+    else
+    {
+        self.gender = @"F";
+        self.selectedGender = @"F";
+        
+        [femBtn setSelected:YES];
+        [maleBtn setSelected:NO];
+    }
+}
+
 /*
 #pragma mark - Navigation
 
@@ -274,52 +333,40 @@
         NSString *resident_name = self.residentNameTxtFld.text;
         NSString *resident_age_range = self.ageBtn.titleLabel.text;
         NSString *resident_gender = self.selectedGender;
-        NSString *resident_race = self.selectedRace;
+        NSString *resident_race = self.raceBtn.titleLabel.text;
 
         NSString *resident_contact = self.contactTxtFld.text;
         NSString *resident_email = self.emailTxFld.text;
         NSString *other_contact = self.otherContactTxtFld.text;
+        NSString *specify_area = self.areaTxtFld.text;
         
-        if(self.client_survey_address_id == 0)
+        //update specify area based on survey address id
+        BOOL upSpecArea = [db executeUpdate:@"update su_address set specify_area = ? where client_address_id = ?",specify_area,[NSNumber numberWithLongLong:self.client_survey_address_id]];
+        if(!upSpecArea)
         {
-            BOOL insSurveyAddress = [db executeUpdate:@"insert into su_address (address, unit_no, specify_area, postal_code) values (?,?,?,?)",self.surveyAddressTxtFld.text, self.unitNoTxtFld.text, self.areaTxtFld.text, self.surveyAddressPostalCode];
-            
-            if(!insSurveyAddress)
-            {
-                *rollback = YES;
-                return;
-            }
-            self.client_survey_address_id = [db lastInsertRowId];
+            *rollback = YES;
+            return;
         }
-        else
-        {
-            BOOL insSurveyAddress = [db executeUpdate:@"update su_address set address = ?, unit_no = ?, specify_area = ?, postal_code = ? where client_address_id = ?",self.surveyAddressTxtFld.text, self.unitNoTxtFld.text, self.areaTxtFld.text, self.surveyAddressPostalCode, [NSNumber numberWithLongLong:self.client_survey_address_id]];
-            
-            if(!insSurveyAddress)
-            {
-                *rollback = YES;
-                return;
-            }
-        }
-        
         
         
         if(self.residentAddressTxtFld.text.length > 0 && self.residentAddressTxtFld.text != nil)
         {
             if(self.client_resident_address_id == 0)
             {
-                BOOL insResidentAddress = [db executeUpdate:@"insert into su_address (address, unit_no, specify_area) values (?,?,?)",self.residentAddressTxtFld.text, self.unitNoTxtFld.text, self.areaTxtFld.text];
+                BOOL insResidentAddress = [db executeUpdate:@"insert into su_address (address, unit_no, specify_area, postal_code, block_id) values (?,?,?,?,?)",self.residentAddressTxtFld.text, self.unitNoTxtFld.text, self.areaTxtFld.text, self.residentAddressPostalCode,residentBlockId];
                 
                 if(!insResidentAddress)
                 {
                     *rollback = YES;
                     return;
                 }
-                self.client_survey_address_id = [db lastInsertRowId];
+                residentAddressIsNew = YES;
+                self.client_resident_address_id = [db lastInsertRowId];
+                DDLogVerbose(@"client_resident_address_id %lld",self.client_resident_address_id);
             }
             else
             {
-                BOOL insResidentAddress = [db executeUpdate:@"update su_address set address = ?, unit_no = ?, specify_area = ? where client_address_id = ?",self.residentAddressTxtFld.text, self.unitNoTxtFld.text, self.areaTxtFld.text, [NSNumber numberWithLongLong:self.client_resident_address_id]];
+                BOOL insResidentAddress = [db executeUpdate:@"update su_address set address = ?, unit_no = ?, specify_area = ?, postal_code = ?, block_id = ? where client_address_id = ?",self.residentAddressTxtFld.text, self.unitNoTxtFld.text, self.areaTxtFld.text,self.residentAddressPostalCode,residentBlockId, [NSNumber numberWithLongLong:self.client_resident_address_id]];
                 
                 if(!insResidentAddress)
                 {
@@ -337,17 +384,35 @@
         else
             theSurveyId = surveyId;
         
-        BOOL up = [db executeUpdate:@"update su_survey set client_survey_address_id = ?, resident_name = ?, resident_age_range = ?, resident_gender = ?, resident_race = ?, client_resident_address_id = ?, resident_contact = ?, status = ?, resident_email = ?, other_contact = ? where client_survey_id = ?",[NSNumber numberWithLongLong:self.client_survey_address_id],resident_name,resident_age_range,resident_gender,resident_race,[NSNumber numberWithLongLong:self.client_resident_address_id],resident_contact,[NSNumber numberWithInt:1],resident_email,other_contact,theSurveyId];
-        
-        if(!up)
+        if(residentAddressIsNew == NO)
         {
-            *rollback = YES;
-            return;
+            BOOL up = [db executeUpdate:@"update su_survey set client_survey_address_id = ?, resident_name = ?, resident_age_range = ?, resident_gender = ?, resident_race = ?, client_resident_address_id = ?, resident_contact = ?, status = ?, resident_email = ?, other_contact = ? where client_survey_id = ?",[NSNumber numberWithLongLong:self.client_survey_address_id],resident_name,resident_age_range,resident_gender,resident_race,[NSNumber numberWithLongLong:self.client_resident_address_id],resident_contact,[NSNumber numberWithInt:1],resident_email,other_contact,theSurveyId];
+            
+            if(!up)
+            {
+                *rollback = YES;
+                return;
+            }
+            else
+            {
+                [self dismissViewControllerAnimated:YES completion:nil];
+            }
         }
         else
         {
-            [self dismissViewControllerAnimated:YES completion:nil];
+            BOOL up = [db executeUpdate:@"update su_survey set client_survey_address_id = ?, resident_name = ?, resident_age_range = ?, resident_gender = ?, resident_race = ?, client_resident_address_id = ?,resident_address_id = ?, resident_contact = ?, status = ?, resident_email = ?, other_contact = ? where client_survey_id = ?",[NSNumber numberWithLongLong:self.client_survey_address_id],resident_name,resident_age_range,resident_gender,resident_race,[NSNumber numberWithLongLong:self.client_resident_address_id],[NSNumber numberWithInt:0], resident_contact,[NSNumber numberWithInt:1],resident_email,other_contact,theSurveyId];
+            
+            if(!up)
+            {
+                *rollback = YES;
+                return;
+            }
+            else
+            {
+                [self dismissViewControllerAnimated:YES completion:nil];
+            }
         }
+        
     }];
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{

@@ -22,13 +22,46 @@
 {
     NSMutableArray *surveyArr = [[NSMutableArray alloc] init];
     NSNumber *zero = [NSNumber numberWithInt:0];
+    
+    __block BOOL atleastOneOverdueWasFound = NO;
 
     if(segment == 0)
     {
         [myDatabase.databaseQ inTransaction:^(FMDatabase *db, BOOL *rollback) {
-            FMResultSet *rs = [db executeQuery:@"select * from su_survey where isMine = ? and created_by = ? order by survey_date desc",[NSNumber numberWithBool:YES],[myDatabase.userDictionary valueForKey:@"user_id"]];
+            FMResultSet *rs = [db executeQuery:@"select * from su_survey where isMine = ? order by survey_date desc",[NSNumber numberWithBool:YES]];
             
             while ([rs next]) {
+                
+                NSNumber *clientSurveyId = [NSNumber numberWithInt:[rs intForColumn:@"client_survey_id"]];
+                NSNumber *surveyId = [NSNumber numberWithInt:[rs intForColumn:@"survey_id"]];
+                
+                
+                //check if this survey got feedback
+                FMResultSet *rsChecFeedB = [db executeQuery:@"select * from su_feedback where client_survey_id = ? or survey_id = ? ",clientSurveyId,surveyId];
+                
+                while ([rsChecFeedB next]) {
+                    NSNumber *feedBackId = [NSNumber numberWithInt:[rsChecFeedB intForColumn:@"feedback_id"]];
+                    NSNumber *clientFeedBackId = [NSNumber numberWithInt:[rsChecFeedB intForColumn:@"client_feedback_id"]];
+                    
+                    //check if this feedback got issues with existing post_id
+                    FMResultSet *rsCheckFi = [db executeQuery:@"select * from su_feedback_issue where (client_feedback_id = ? or feedback_id = ?) and (client_post_id != ? or post_id != ?)",clientFeedBackId,feedBackId,zero,zero];
+                    
+                    while ([rsCheckFi next]) {
+                        NSNumber *client_post_id = [NSNumber numberWithInt:[rsCheckFi intForColumn:@"client_post_id"]];
+                        NSNumber *post_id = [NSNumber numberWithInt:[rsCheckFi intForColumn:@"post_id"]];
+                        
+                        NSDate *now = [NSDate date];
+                        NSDate *daysAgo = [now dateByAddingTimeInterval:-overDueDays*24*60*60];
+                        double timestampDaysAgo = [daysAgo timeIntervalSince1970];
+                        
+                        //check if this post is overdue
+                        FMResultSet *rsCheckPost = [db executeQuery:@"select * from post where (client_post_id = ? or post_id = ?) and post_date <= ? and status != ?",client_post_id,post_id,[NSNumber numberWithDouble:timestampDaysAgo],[NSNumber numberWithInt:4]];
+                        
+                        if([rsCheckPost next])
+                            atleastOneOverdueWasFound = YES;
+                    }
+                }
+                
                 //check if this survey got atleast 1 answer, if not, don't add this survery
                 FMResultSet *check = [db executeQuery:@"select * from su_answers where client_survey_id = ? or survey_id = ?",[NSNumber numberWithInt:[rs intForColumn:@"client_survey_id"]],[NSNumber numberWithInt:[rs intForColumn:@"survey_id"]]];
                 
@@ -61,19 +94,19 @@
                         [row setObject:[rsAdd resultDictionary] forKey:@"address"];
                     }
                     
-                    [surveyArr addObject:row];
+                    //don't add overdue survey!
+                    if(atleastOneOverdueWasFound == NO)
+                        [surveyArr addObject:row];
                 }
             }
         }];
     }
     else if(segment == 1)
     {
-        NSNumber *zero = [NSNumber numberWithInt:0];
-        
         NSMutableDictionary *groupedDict = [[NSMutableDictionary alloc] init];
         
         [myDatabase.databaseQ inTransaction:^(FMDatabase *db, BOOL *rollback) {
-            FMResultSet *rsGetSurvey = [db executeQuery:@"select created_by from su_survey where isMine = ? or created_by != ? group by created_by order by survey_date desc",zero,[myDatabase.userDictionary valueForKey:@"user_id"]];
+            FMResultSet *rsGetSurvey = [db executeQuery:@"select created_by from su_survey where isMine = ? group by created_by order by survey_date desc",[NSNumber numberWithBool:NO]];
             
             while ([rsGetSurvey next]) {
                 NSString *createdBy = [rsGetSurvey stringForColumn:@"created_by"];
@@ -136,7 +169,7 @@
         __block BOOL atleastOneOverdueWasFound = NO;
         
         [myDatabase.databaseQ inTransaction:^(FMDatabase *db, BOOL *rollback) {
-            FMResultSet *rs = [db executeQuery:@"select * from su_survey where isMine = ? and created_by = ? order by survey_date desc",[NSNumber numberWithBool:YES],[myDatabase.userDictionary valueForKey:@"user_id"]];
+            FMResultSet *rs = [db executeQuery:@"select * from su_survey where isMine = ? order by survey_date desc",[NSNumber numberWithBool:YES]];
             
             while ([rs next]) {
                 
@@ -189,6 +222,8 @@
                     NSMutableDictionary *row = [[NSMutableDictionary alloc] init];
                     
                     [row setObject:answers forKey:@"answers"];
+                    
+                    [row setObject:[rs resultDictionary] forKey:@"survey"];
                     
                     //get address details
                     NSNumber *clientAddressId = [NSNumber numberWithInt:[rs intForColumn:@"client_survey_address_id"]];

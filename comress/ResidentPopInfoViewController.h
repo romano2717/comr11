@@ -11,6 +11,7 @@
 #import "Database.h"
 #import "Survey.h"
 #import "Blocks.h"
+#import "ActionSheetStringPicker.h"
 
 @interface ResidentPopInfoViewController : UIViewController<MPGTextFieldDelegate,UITextFieldDelegate>
 {
@@ -38,6 +39,7 @@
 @property (nonatomic, strong) NSString *selectedGender;
 @property (nonatomic, strong) NSString *selectedRace;
 @property (nonatomic, strong) NSString *selectedAgeRange;
+@property (nonatomic, strong) NSString *gender;
 
 @property (nonatomic, strong) NSArray *ageRangeArray;
 @property (nonatomic, strong) NSArray *raceArray;
@@ -51,6 +53,6 @@
 @property (nonatomic, strong) NSMutableArray *addressArray;
 @property (nonatomic, strong) NSNumber *blockId;
 @property (nonatomic, strong) NSNumber *residentBlockId;
-
+@property (nonatomic) BOOL residentAddressIsNew;
 
 @end

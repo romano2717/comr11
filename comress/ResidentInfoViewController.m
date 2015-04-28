@@ -560,11 +560,13 @@
     {
         if(buttonIndex == 1)
         {
+            
             [self saveResidentAdressWithSegueToFeedback:YES forBtnAction:@"feedback"];
         }
         else if(buttonIndex == 2)
         {
-            [self saveResidentAdressWithSegueToFeedback:NO forBtnAction:@"done"];
+            [self surveyIsCompletedUpdateTheStatus];
+            //[self saveResidentAdressWithSegueToFeedback:NO forBtnAction:@"done"];
         }
     }
     
@@ -575,11 +577,41 @@
     UIButton *btn = (UIButton *)sender;
     
     if (btn.tag == 1)
+    {
+
         [self saveResidentAdressWithSegueToFeedback:YES forBtnAction:@"feedback"];
+    }
+
 
     else
+    {
         [self saveResidentAdressWithSegueToFeedback:NO forBtnAction:@"done"];
+    }
+}
+
+//this method is called when the pop-up action and selected Complete this survey
+- (void)surveyIsCompletedUpdateTheStatus
+{
+    [myDatabase.databaseQ inTransaction:^(FMDatabase *db, BOOL *rollback) {
+        BOOL up = [db executeUpdate:@"update su_survey set status = ? where client_survey_id = ? ",[NSNumber numberWithInt:1],[NSNumber numberWithLongLong:currentSurveyId]];
         
+        if(!up)
+        {
+            *rollback = YES;
+            return;
+        }
+        
+        //survey is Done!
+        //upload this survey
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            Synchronize *sync = [Synchronize sharedManager];
+            [sync uploadSurveyFromSelf:NO];
+        });
+        
+        didAddFeedBack = NO;
+    }];
+    
+    [self performSegueWithIdentifier:@"push_survey_detail" sender:self];
 }
 
 - (void)saveResidentAdressWithSegueToFeedback:(BOOL)goToFeedback forBtnAction:(NSString *)action
@@ -622,13 +654,15 @@
         NSString *other_resident_contact = self.otherContactNoTxFld.text;
         NSString *resident_email = self.emailTxFld.text;
         
-        BOOL up;
+        BOOL up = NO;
 
         long long lastSurveyAddressId = 0;
         long long lastResidentAddressId = 0;
         
         if(self.surveyAddressTxtFld.text != nil && self.surveyAddressTxtFld.text.length > 0 && ![self.postalCode isEqualToString:@"-1"] && self.postalCode.length > 0 && blockId != 0)
         {
+            
+            
             BOOL insSurveyAddress = [db executeUpdate:@"insert into su_address (address, unit_no, specify_area, postal_code, block_id) values (?,?,?,?,?)",self.surveyAddressTxtFld.text, self.unitNoTxtFld.text, self.areaTxtFld.text, self.postalCode, blockId];
             
             if(!insSurveyAddress)
@@ -636,8 +670,9 @@
                 *rollback = YES;
                 return;
             }
-            
+        
             lastSurveyAddressId = [db lastInsertRowId];
+            
         }
         else
         {
@@ -655,8 +690,9 @@
                 *rollback = YES;
                 return;
             }
-            
+        
             lastResidentAddressId = [db lastInsertRowId];
+
         }
         
         
@@ -681,8 +717,15 @@
         NSNumber *client_survey_address_id = [NSNumber numberWithInt:[[surveyAddressDict valueForKey:@"client_address_id"] intValue]];
         NSNumber *client_resident_address_id = [NSNumber numberWithInt:[[residentAddressDict valueForKey:@"client_address_id"] intValue]];
         
+        
         up = [db executeUpdate:@"update su_survey set client_survey_address_id = ?, survey_date = ?, resident_name = ?, resident_age_range = ?, resident_gender = ?, resident_race = ?, client_resident_address_id = ?, average_rating = ?, resident_contact = ?, resident_email = ?,other_contact = ? where client_survey_id = ?",client_survey_address_id,survey_date,resident_name,resident_age_range,resident_gender,resident_race,client_resident_address_id,average_rating,resident_contact,resident_email,other_resident_contact,[NSNumber numberWithLongLong:currentSurveyId]];
-
+        
+        if(!up)
+        {
+            *rollback = YES;
+            return;
+        }
+        
         if ([action isEqualToString:@"done"])
         {
             up = [db executeUpdate:@"update su_survey set status = ? where client_survey_id = ? ",[NSNumber numberWithInt:1],[NSNumber numberWithLongLong:currentSurveyId]];
@@ -695,12 +738,6 @@
             });
             
             didAddFeedBack = NO;
-        }
-        
-        if(!up)
-        {
-            *rollback = YES;
-            return;
         }
         
         if(goToFeedback)

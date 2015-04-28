@@ -75,6 +75,16 @@
 //    self.wifiReachability = [Reachability reachabilityForLocalWiFi];
 //    [self.wifiReachability startNotifier];
 //    [self updateInterfaceWithReachability:self.wifiReachability];
+    
+    
+    if(launchOptions[UIApplicationLaunchOptionsRemoteNotificationKey])
+    {
+        [self application:application didReceiveRemoteNotification:launchOptions[UIApplicationLaunchOptionsRemoteNotificationKey]];
+    }
+    
+    //[[UINavigationBar appearance] setBarTintColor:[UIColor colorWithRed:0 green:125.0f/255.0f blue:176.0f/255.0f alpha:1.0f]];
+    
+    
     return YES;
 }
 
@@ -364,6 +374,7 @@
         [sync startDownloadPostForPage:1 totalPage:0 requestDate:jsonDate];
     }];
 }
+
 
 - (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler
 {

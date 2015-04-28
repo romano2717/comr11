@@ -1075,7 +1075,8 @@
                     
                     NSDictionary *dictAddSurvey = @{@"ClientAddressId":ClientAddressId,@"Location":Location,@"UnitNo":UnitNo,@"SpecifyArea":SpecifyArea,@"PostalCode":PostalCode,@"BlkId":BlkId};
                     
-                    [addressArray addObject:dictAddSurvey];
+                    if([addressArray containsObject:dictAddSurvey] == NO)
+                        [addressArray addObject:dictAddSurvey];
                 }
             }
             
@@ -1299,10 +1300,10 @@
             while ([rsAddres next]) {
                 NSNumber *ClientAddressId = [NSNumber numberWithInt:[rsAddres intForColumn:@"client_address_id"]];
                 NSNumber *AddressId = [NSNumber numberWithInt:[rsAddres intForColumn:@"address_id"]];
-                NSString *Location = [rsAddres stringForColumn:@"address"];
-                NSString *UnitNo = [rsAddres stringForColumn:@"unit_no"];
-                NSString *SpecifyArea = [rsAddres stringForColumn:@"specify_area"];
-                NSString *PostalCode = [rsAddres stringForColumn:@"postal_code"];
+                NSString *Location = [rsAddres stringForColumn:@"address"] ? [rsAddres stringForColumn:@"address"] : @"";
+                NSString *UnitNo = [rsAddres stringForColumn:@"unit_no"] ? [rsAddres stringForColumn:@"unit_no"] : @"";
+                NSString *SpecifyArea = [rsAddres stringForColumn:@"specify_area"] ? [rsAddres stringForColumn:@"specify_area"] : @"";
+                NSString *PostalCode = [rsAddres stringForColumn:@"postal_code"] ? [rsAddres stringForColumn:@"postal_code"] : @"";
                 
                 NSDictionary *dictAd = @{@"ClientAddressId" : ClientAddressId, @"AddressId" : AddressId, @"Location" : Location , @"UnitNo" : UnitNo , @"SpecifyArea" : SpecifyArea, @"PostalCode": PostalCode };
                 
@@ -1315,7 +1316,6 @@
     
 
     NSDictionary *surveyDict = @{@"surveyContainer" : surveyContainer};
-    
     DDLogVerbose(@"surveyContainer %@",[myDatabase toJsonString:surveyDict]);
     DDLogVerbose(@"guid %@",[myDatabase.userDictionary valueForKey:@"guid"]);
     
